@@ -1,11 +1,18 @@
 package cde.academica
 
 import android.annotation.SuppressLint
+import android.app.DownloadManager
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.webkit.*
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import cde.academica.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -13,11 +20,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var scriptsInjected = false
 
+    companion object {
+        private const val LOGIN_URL = "academicanet.com/index"
+        private const val COLOR_LOGIN = Color.parseColor("#1a237e")
+        private const val COLOR_WELCOME = Color.parseColor("#FFFFFF")
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        window.navigationBarColor = Color.TRANSPARENT
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
@@ -38,12 +54,14 @@ class MainActivity : AppCompatActivity() {
                 displayZoomControls = false
                 useWideViewPort = true
                 loadWithOverviewMode = true
+                setSupportMultipleWindows(false)
             }
 
             webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
                     scriptsInjected = false
+                    url?.let { updateStatusBarColor(it) }
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -52,6 +70,25 @@ class MainActivity : AppCompatActivity() {
                         injectAllScripts(view)
                         scriptsInjected = true
                     }
+                }
+
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    val url = request?.url?.toString() ?: return false
+                    if (url.startsWith("blob:")) {
+                        Toast.makeText(this@MainActivity, "Descargando archivo...", Toast.LENGTH_SHORT).show()
+                        view?.evaluateJavascript(
+                            """
+                            (function(){
+                                var link = document.createElement('a');
+                                link.href = '$url';
+                                link.target = '_blank';
+                                link.click();
+                            })();
+                            """.trimIndent(), null
+                        )
+                        return true
+                    }
+                    return false
                 }
 
                 override fun onReceivedError(
@@ -81,9 +118,45 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
             }
+
+            setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
+                try {
+                    val request = DownloadManager.Request(Uri.parse(url)).apply {
+                        setMimeType(mimeType)
+                        addRequestHeader("User-Agent", userAgent)
+                        setDescription("Descargando archivo...")
+                        setTitle(URLUtil.guessFileName(url, contentDisposition, mimeType))
+                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                        setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimeType))
+                        allowScanningByMediaScanner()
+                    }
+                    val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                    dm.enqueue(request)
+                    Toast.makeText(this@MainActivity, "Descarga iniciada", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                        data = Uri.parse(url)
+                    }
+                    startActivity(intent)
+                }
+            }
         }
 
-        binding.webView.loadUrl("https://academicanet.com")
+        binding.webView.loadUrl("https://academicanet.com/Views/Student/Welcome")
+    }
+
+    private fun updateStatusBarColor(url: String) {
+        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+        when {
+            url.contains(LOGIN_URL) || url == "https://academicanet.com/" || url == "https://academicanet.com" -> {
+                window.statusBarColor = COLOR_LOGIN
+                insetsController.isAppearanceLightStatusBars = false
+            }
+            else -> {
+                window.statusBarColor = COLOR_WELCOME
+                insetsController.isAppearanceLightStatusBars = true
+            }
+        }
     }
 
     private fun injectAllScripts(webView: WebView) {
@@ -105,10 +178,32 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        if (binding.webView.canGoBack()) {
-            binding.webView.goBack()
-        } else {
+        val currentUrl = binding.webView.url ?: ""
+        val canGoBack = binding.webView.canGoBack()
+
+        if (!canGoBack) {
             super.onBackPressed()
+            return
         }
+
+        if (currentUrl.contains("Welcome") || currentUrl.contains("/Views/")) {
+            binding.webView.copyBackForwardList().let { list ->
+                val prevIndex = list.currentIndex - 1
+                if (prevIndex >= 0) {
+                    val prevUrl = list.getItemAtIndex(prevIndex).url
+                    if (prevUrl.contains(LOGIN_URL) || prevUrl == "https://academicanet.com/") {
+                        super.onBackPressed()
+                        return
+                    }
+                }
+            }
+        }
+
+        if (currentUrl.contains(LOGIN_URL) || currentUrl == "https://academicanet.com/") {
+            super.onBackPressed()
+            return
+        }
+
+        binding.webView.goBack()
     }
 }
