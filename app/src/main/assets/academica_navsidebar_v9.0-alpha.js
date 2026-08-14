@@ -21,9 +21,31 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body { overflow-x: hidden !important; min-width: auto !important; }
 
 /* ═══════════════════════════════════════════
-   FONDO HEXAGONAL GLOBAL (todas las páginas)
+   DRAG TARGET - MÁS ANCHO PARA SWIPE / TAP
+   Sin esta regla la sidebar no abre al tocar
+   el borde izquierdo ni al hacer swipe.
+   Restaurado desde v8.6.
    ═══════════════════════════════════════════ */
-body {
+.drag-target {
+    width: 40px !important;
+    z-index: 1032 !important;
+}
+
+/* Asegurar que la sidebar siempre sea interactuable */
+.main-menu {
+    display: block !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+.main-menu.menu-open {
+    transform: translate3d(0, 0, 0) !important;
+}
+
+/* ═══════════════════════════════════════════
+   FONDO HEXAGONAL GLOBAL (todas las páginas EXCEPTO login)
+   En login lo sobreescribe academica_login_cleanup.
+   ═══════════════════════════════════════════ */
+body:not(:has(.contact__form)) {
     background-color: #f8f9fa !important;
     background-image:
         radial-gradient(circle, rgba(160, 170, 185, 0.35) 2px, transparent 2.5px),
