@@ -12,6 +12,7 @@ import android.os.Environment
 import android.view.View
 import android.webkit.*
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -21,11 +22,20 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private var scriptsInjected = false
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
     companion object {
         private const val LOGIN_URL = "academicanet.com/index"
         private val COLOR_LOGIN = Color.parseColor("#1a237e")
         private val COLOR_WELCOME = Color.parseColor("#FFFFFF")
+    }
+
+    // Selector de archivos nativo de Android
+    private val filePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        filePathCallback?.onReceiveValue(uris.toTypedArray())
+        filePathCallback = null
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -51,7 +61,6 @@ class MainActivity : AppCompatActivity() {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
-                // Cache primero, red como fallback
                 cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
                 allowFileAccess = true
                 allowContentAccess = true
@@ -63,13 +72,11 @@ class MainActivity : AppCompatActivity() {
                 useWideViewPort = true
                 loadWithOverviewMode = true
                 setSupportMultipleWindows(false)
-                // Performance
                 loadsImagesAutomatically = true
                 blockNetworkImage = false
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     offscreenPreRaster = true
                 }
-                // Media sin gesto de usuario (para autoplay si hace falta)
                 mediaPlaybackRequiresUserGesture = true
             }
 
@@ -158,6 +165,18 @@ class MainActivity : AppCompatActivity() {
                             "${it.sourceId()}:${it.lineNumber()} - ${it.message()}"
                         )
                     }
+                    return true
+                }
+
+                // File picker: cuando la web pide subir un archivo
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    filePathCallback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    this@MainActivity.filePathCallback?.onReceiveValue(null)
+                    this@MainActivity.filePathCallback = filePathCallback
+                    filePickerLauncher.launch("*/*")
                     return true
                 }
             }
