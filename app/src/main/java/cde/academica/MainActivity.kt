@@ -14,8 +14,11 @@ import android.webkit.*
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.updatePadding
 import cde.academica.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -47,6 +50,16 @@ class MainActivity : AppCompatActivity() {
         // Nav bar transparente
         window.navigationBarColor = Color.TRANSPARENT
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        // Empuja el contenido del WebView por debajo de la status bar y por encima
+        // de la nav bar, para que la web no quede tapada por los system bars.
+        ViewCompat.setOnApplyWindowInsetsListener(binding.webView) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            v.updatePadding(top = bars.top, bottom = bars.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
 
         // CookieManager: sesion persistente
         val cookieManager = CookieManager.getInstance()
@@ -228,6 +241,7 @@ class MainActivity : AppCompatActivity() {
             "academica_optimizer_v9.0-alpha.js",
             "academica_content_general_v9.0-alpha.js",
             "academica_navsidebar_v9.0-alpha.js",
+            "academica_login_cleanup_v9.0-alpha.js",
             "academica_welcome_cleanup_v9.0-alpha.js"
         )
 
