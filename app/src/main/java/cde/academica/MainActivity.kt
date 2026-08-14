@@ -22,8 +22,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val LOGIN_URL = "academicanet.com/index"
-        private const val COLOR_LOGIN = Color.parseColor("#1a237e")
-        private const val COLOR_WELCOME = Color.parseColor("#FFFFFF")
+        private val COLOR_LOGIN = Color.parseColor("#1a237e")
+        private val COLOR_WELCOME = Color.parseColor("#FFFFFF")
     }
 
     @SuppressLint("SetJavaScriptEnabled")
