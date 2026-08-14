@@ -78,6 +78,20 @@ class MainActivity : AppCompatActivity() {
                     super.onPageStarted(view, url, favicon)
                     scriptsInjected = false
                     url?.let { updateStatusBarColor(it) }
+
+                    // Anti-FOUC: ocultar TODO antes de que cargue nada
+                    view?.evaluateJavascript(
+                        """
+                        (function(){
+                            if (!document.getElementById('academica-anti-fouc')) {
+                                var s = document.createElement('style');
+                                s.id = 'academica-anti-fouc';
+                                s.textContent = 'html { visibility: hidden !important; }';
+                                document.documentElement.appendChild(s);
+                            }
+                        })();
+                        """.trimIndent(), null
+                    )
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -85,6 +99,19 @@ class MainActivity : AppCompatActivity() {
                     if (view != null && !scriptsInjected) {
                         injectAllScripts(view)
                         scriptsInjected = true
+
+                        // Quitar anti-FOUC: revelar pagina suavemente
+                        view.evaluateJavascript(
+                            """
+                            (function(){
+                                var s = document.getElementById('academica-anti-fouc');
+                                if (s) {
+                                    s.textContent = 'html { visibility: visible !important; opacity: 1 !important; transition: opacity 0.15s ease; }';
+                                    setTimeout(function(){ s.remove(); }, 200);
+                                }
+                            })();
+                            """.trimIndent(), null
+                        )
                     }
                 }
 
