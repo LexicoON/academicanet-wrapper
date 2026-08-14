@@ -15,15 +15,44 @@
         android:theme="@style/Theme.AcademicaNet"
         android:usesCleartextTraffic="false">
         
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+<activity
+    android:name=".MainActivity"
+    android:exported="true"
+    android:configChanges="orientation|screenSize|keyboardHidden">
+
+    <!-- Lanzador desde el icono del launcher -->
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+
+    <!-- Deep links HTTPS: abre la app cuando tocas un link academicanet.com -->
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+
+        <data android:scheme="https" />
+        <data android:host="academicanet.com" />
+        <data android:host="www.academicanet.com" />
+
+        <!-- PathPrefix cubre /Views/Student/Welcome, /index, /Mensaje, etc. -->
+        <data android:pathPrefix="/" />
+    </intent-filter>
+
+    <!-- Mismo pero para HTTP (por si algun link viene sin TLS) -->
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+
+        <data android:scheme="http" />
+        <data android:host="academicanet.com" />
+        <data android:host="www.academicanet.com" />
+
+        <data android:pathPrefix="/" />
+    </intent-filter>
+</activity>
     </application>
 
 </manifest>
