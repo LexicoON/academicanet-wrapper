@@ -69,6 +69,7 @@ class MainActivity : AppCompatActivity() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     offscreenPreRaster = true
                 }
+                // Media sin gesto de usuario (para autoplay si hace falta)
                 mediaPlaybackRequiresUserGesture = true
             }
 
