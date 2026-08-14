@@ -417,6 +417,103 @@ select.form-control { font-size: 16px !important; }
     .footer [class*="col-"] { text-align: center !important; margin-bottom: 0.3rem !important; }
 }
 
+/* ═══════════════════════════════════════════
+   LOGIN LIMPIO — Solo en pagina de inicio
+   Oculta marketing, deja solo el formulario
+   ═══════════════════════════════════════════ */
+body:has(.contact__form) {
+    background: #1a237e !important;
+    background-image: none !important;
+}
+body:has(.contact__form) .header,
+body:has(.contact__form) .navbar,
+body:has(.contact__form) .footer,
+body:has(.contact__form) .curve-container,
+body:has(.contact__form) section:not(:has(.contact__form)),
+body:has(.contact__form) .whatsapp-float,
+body:has(.contact__form) [class*="owl-carousel"],
+body:has(.contact__form) [class*="banner"],
+body:has(.contact__form) img[src*="playA"],
+body:has(.contact__form) img[src*="storeA"] {
+    display: none !important;
+}
+body:has(.contact__form) .container,
+body:has(.contact__form) .row,
+body:has(.contact__form) .col-lg-5,
+body:has(.contact__form) .col-md-12 {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 100vh !important;
+}
+body:has(.contact__form) .contact__form {
+    background: rgba(255,255,255,0.08) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 20px !important;
+    padding: 2rem 1.5rem !important;
+    width: 90% !important;
+    max-width: 360px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2) !important;
+}
+body:has(.contact__form) .contact__form h2 {
+    color: #fff !important;
+    text-align: center !important;
+    font-size: 1.4rem !important;
+    margin-bottom: 1.5rem !important;
+    font-weight: 600 !important;
+}
+body:has(.contact__form) .contact__form .form-group {
+    margin-bottom: 1rem !important;
+}
+body:has(.contact__form) .contact__form input[type="text"],
+body:has(.contact__form) .contact__form input[type="password"] {
+    background: rgba(255,255,255,0.12) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    color: #fff !important;
+    border-radius: 12px !important;
+    padding: 0.9rem 1rem !important;
+    font-size: 16px !important;
+    width: 100% !important;
+    height: auto !important;
+}
+body:has(.contact__form) .contact__form input::placeholder {
+    color: rgba(255,255,255,0.5) !important;
+}
+body:has(.contact__form) .contact__form .btn-primary {
+    background: #A5B4FC !important;
+    border: none !important;
+    color: #1a237e !important;
+    border-radius: 12px !important;
+    padding: 0.9rem !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    margin-top: 0.5rem !important;
+    box-shadow: 0 4px 16px rgba(165,180,252,0.3) !important;
+}
+body:has(.contact__form) .contact__form .btn-primary:active {
+    transform: scale(0.97) !important;
+}
+body:has(.contact__form) .contact__form a[href*="Recovery"] {
+    color: rgba(255,255,255,0.7) !important;
+    text-align: center !important;
+    display: block !important;
+    margin-top: 1rem !important;
+    font-size: 0.85rem !important;
+    text-decoration: none !important;
+}
+body:has(.contact__form) .contact__form hr,
+body:has(.contact__form) .contact__form a[href*="play.google"],
+body:has(.contact__form) .contact__form a[href*="apps.apple"] {
+    display: none !important;
+}
+
 /* TABLET — SIN margin-left: 0 en content-wrapper */
 @media (min-width: 769px) and (max-width: 1024px) {
     .main-menu { width: 280px !important; }
