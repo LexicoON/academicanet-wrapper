@@ -6,8 +6,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.view.View
 import android.webkit.*
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -22,8 +24,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val LOGIN_URL = "academicanet.com/index"
-        private const val COLOR_LOGIN = Color.parseColor("#1a237e")
-        private const val COLOR_WELCOME = Color.parseColor("#FFFFFF")
+        private val COLOR_LOGIN = Color.parseColor("#1a237e")
+        private val COLOR_WELCOME = Color.parseColor("#FFFFFF")
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -32,19 +34,25 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Nav bar transparente
         window.navigationBarColor = Color.TRANSPARENT
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        // CookieManager: sesion persistente
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(binding.webView, true)
 
         binding.webView.apply {
+            // Hardware acceleration GPU
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
-                cacheMode = WebSettings.LOAD_DEFAULT
+                // Cache primero, red como fallback
+                cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
                 allowFileAccess = true
                 allowContentAccess = true
                 mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
@@ -55,6 +63,14 @@ class MainActivity : AppCompatActivity() {
                 useWideViewPort = true
                 loadWithOverviewMode = true
                 setSupportMultipleWindows(false)
+                // Performance
+                loadsImagesAutomatically = true
+                blockNetworkImage = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    offscreenPreRaster = true
+                }
+                // Media sin gesto de usuario (para autoplay si hace falta)
+                mediaPlaybackRequiresUserGesture = true
             }
 
             webViewClient = object : WebViewClient() {
@@ -119,6 +135,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            // Descargas: selector nativo de Android
             setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
                 try {
                     val request = DownloadManager.Request(Uri.parse(url)).apply {
@@ -142,6 +159,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Cargar Welcome (si no esta logueado, el servidor redirige a login)
         binding.webView.loadUrl("https://academicanet.com/Views/Student/Welcome")
     }
 
@@ -163,7 +181,8 @@ class MainActivity : AppCompatActivity() {
         val scripts = listOf(
             "academica_optimizer_v9.0-alpha.js",
             "academica_content_general_v9.0-alpha.js",
-            "academica_navsidebar_v9.0-alpha.js"
+            "academica_navsidebar_v9.0-alpha.js",
+            "academica_welcome_cleanup_v9.0-alpha.js"
         )
 
         scripts.forEach { filename ->
