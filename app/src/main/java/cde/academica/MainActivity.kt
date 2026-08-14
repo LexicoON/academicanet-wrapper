@@ -180,7 +180,6 @@ class MainActivity : AppCompatActivity() {
     private fun injectAllScripts(webView: WebView) {
         val scripts = listOf(
             "academica_optimizer_v9.0-alpha.js",
-            "academica_performance_v9.0-alpha.js",
             "academica_content_general_v9.0-alpha.js",
             "academica_navsidebar_v9.0-alpha.js",
             "academica_welcome_cleanup_v9.0-alpha.js"
