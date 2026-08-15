@@ -1,0 +1,78 @@
+/* ACADEMICA NET - LOGIN CLEANUP (extracted from academica_login_cleanup_v9.0-alpha.js)
+   File: academica_login.css
+*/
+
+html, body {
+    background: #1a237e !important;
+    background-image: none !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+}
+body {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-direction: column !important;
+    padding: 1.5rem 1rem !important;
+    box-sizing: border-box !important;
+}
+body * { box-sizing: border-box !important; }
+
+/* Ocultar elementos no relevantes en login */
+.header,
+.navbar,
+.footer,
+.curve-container,
+.whatsapp-float,
+[class*="owl-carousel"],
+img[src*="playA"],
+img[src*="storeA"],
+.btn-white,
+a[href*="mailto"],
+.app-content,
+.app-content-overlay,
+.background-image,
+.bg-image,
+.bg-banner,
+.scroll-down,
+.scroll-indicator {
+    display: none !important;
+}
+
+/* Caja blanca centrada */
+body .contact__form,
+body form.login-form,
+body .login-wrapper > form,
+body > form {
+    background: #ffffff !important;
+    border-radius: 20px !important;
+    padding: 2rem 1.5rem !important;
+    width: 100% !important;
+    max-width: 380px !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Ajustes de inputs y botones (conservadores) */
+body .contact__form input,
+body form input {
+    background: #f5f6fa !important;
+    border: 2px solid #e8e9ef !important;
+    color: #1a237e !important;
+    border-radius: 14px !important;
+    padding: 1rem 1.1rem !important;
+    font-size: 16px !important;
+    width: 100% !important;
+    min-height: 48px !important;
+}
+
+/* Forzar ciertas estructuras para que el form quede centrado */
+body > section,
+body > div > section,
+body > .container > section {
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: contents !important;
+}
