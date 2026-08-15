@@ -1,9 +1,7 @@
 name: Build APK
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  workflow_dispatch:  # Solo manual, NO push automatico
 
 jobs:
   build:
@@ -25,74 +23,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.4'
-
-      - name: Install Python deps for vector->png generation
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git python3-pip
-          pip3 install --user pillow
-
-      - name: Generate legacy PNG launcher icons from vectors
-        run: |
-          set -e
-          TMPDIR=$(mktemp -d)
-          git clone --depth 1 https://github.com/Ashinch/VD-Android-VectorDrawable2PNG.git "$TMPDIR/vd2png"
-          mkdir -p "$TMPDIR/out"
-
-          # sizes: ldpi mdpi hdpi xhdpi xxhdpi xxxhdpi
-          declare -a spec=("36 ldpi" "48 mdpi" "72 hdpi" "96 xhdpi" "144 xxhdpi" "192 xxxhdpi")
-
-          for pair in "${spec[@]}"; do
-            size=$(echo "$pair" | awk '{print $1}')
-            density=$(echo "$pair" | awk '{print $2}')
-            outdir="app/src/main/res/mipmap-${density}"
-            mkdir -p "$outdir"
-
-            # render foreground and background PNGs
-            python3 "$TMPDIR/vd2png/VD-Android-VectorDrawable2PNG.py" "app/src/main/res/drawable/ic_launcher_foreground.xml" "$TMPDIR/out/fg_${size}.png" "$size"
-            python3 "$TMPDIR/vd2png/VD-Android-VectorDrawable2PNG.py" "app/src/main/res/drawable/ic_launcher_background.xml" "$TMPDIR/out/bg_${size}.png" "$size"
-
-            # composite fg over bg centered using Python Pillow
-            python3 - <<'PY'
-from PIL import Image
-import sys
-bg = Image.open(sys.argv[1]).convert('RGBA')
-fg = Image.open(sys.argv[2]).convert('RGBA')
-# center fg on bg
-bg_w, bg_h = bg.size
-fg_w, fg_h = fg.size
-x = (bg_w - fg_w) // 2
-y = (bg_h - fg_h) // 2
-out = Image.new('RGBA', bg.size)
-out.paste(bg, (0,0))
-out.paste(fg, (x,y), fg)
-out.save(sys.argv[3])
-PY
-            "$TMPDIR/out/bg_${size}.png" "$TMPDIR/out/fg_${size}.png" "$outdir/ic_launcher.png"
-
-            # For round variant, just copy the same for now
-            cp "$outdir/ic_launcher.png" "$outdir/ic_launcher_round.png"
-          done
-
-          # generate 512px Play Store icon
-          python3 "$TMPDIR/vd2png/VD-Android-VectorDrawable2PNG.py" "app/src/main/res/drawable/ic_launcher_foreground.xml" "$TMPDIR/out/fg_512.png" 512
-          python3 "$TMPDIR/vd2png/VD-Android-VectorDrawable2PNG.py" "app/src/main/res/drawable/ic_launcher_background.xml" "$TMPDIR/out/bg_512.png" 512
-          python3 - <<'PY'
-from PIL import Image
-import sys
-bg = Image.open(sys.argv[1]).convert('RGBA')
-fg = Image.open(sys.argv[2]).convert('RGBA')
-bg_w, bg_h = bg.size
-fg_w, fg_h = fg.size
-x = (bg_w - fg_w) // 2
-y = (bg_h - fg_h) // 2
-out = Image.new('RGBA', bg.size)
-out.paste(bg, (0,0))
-out.paste(fg, (x,y), fg)
-out.save(sys.argv[3])
-PY
-          mkdir -p app/playstore
-          mv "$TMPDIR/out/bg_512.png" app/playstore/icon_512.png
 
       - name: Build APK (Debug)
         run: gradle assembleDebug --no-daemon
