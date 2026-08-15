@@ -22,10 +22,14 @@ import androidx.core.view.updatePadding
 import cde.academica.databinding.ActivityMainBinding
 import java.io.ByteArrayInputStream
 import java.nio.charset.Charset
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 import java.util.Locale
+import android.webkit.CookieManager as AndroidCookieManager
 
 class MainActivity : AppCompatActivity() {
 
@@ -33,11 +37,64 @@ class MainActivity : AppCompatActivity() {
     private var scriptsInjected = false
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
-    // Reusable OkHttp client for interceptor
+    // Reusable OkHttp client for interceptor (uses CookieJar that bridges to Android CookieManager)
     private val httpClient: OkHttpClient by lazy {
+        val cookieJar = object : CookieJar {
+            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+                try {
+                    val cm = AndroidCookieManager.getInstance()
+                    for (c in cookies) {
+                        // Build a minimal cookie string that Android's CookieManager understands
+                        val cookieStr = StringBuilder().apply {
+                            append(c.name).append("=").append(c.value)
+                            if (c.path != null && c.path.isNotEmpty()) append("; Path=").append(c.path)
+                            if (c.domain != null && c.domain.isNotEmpty()) append("; Domain=").append(c.domain)
+                            if (c.secure) append("; Secure")
+                            if (c.httpOnly) append("; HttpOnly")
+                        }.toString()
+                        cm.setCookie(url.toString(), cookieStr)
+                    }
+                    // Flush changes to persistent storage
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) cm.flush() else android.webkit.CookieSyncManager.getInstance().sync()
+                } catch (e: Exception) {
+                    android.util.Log.w("AcademicaNet", "CookieJar.saveFromResponse error: ${e.message}")
+                }
+            }
+
+            override fun loadForRequest(url: HttpUrl): List<Cookie> {
+                try {
+                    val cm = AndroidCookieManager.getInstance()
+                    val cookieHeader = cm.getCookie(url.toString()) ?: return emptyList()
+                    val host = url.host
+                    val list = mutableListOf<Cookie>()
+                    cookieHeader.split(";").forEach { pair ->
+                        val parts = pair.split("=", limit = 2)
+                        if (parts.size == 2) {
+                            val name = parts[0].trim()
+                            val value = parts[1].trim()
+                            try {
+                                val cookie = Cookie.Builder()
+                                    .name(name)
+                                    .value(value)
+                                    .domain(host)
+                                    .path("/")
+                                    .build()
+                                list.add(cookie)
+                            } catch (_: Exception) {}
+                        }
+                    }
+                    return list
+                } catch (e: Exception) {
+                    android.util.Log.w("AcademicaNet", "CookieJar.loadForRequest error: ${e.message}")
+                    return emptyList()
+                }
+            }
+        }
+
         OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)
+            .cookieJar(cookieJar)
             .callTimeout(20, TimeUnit.SECONDS)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
@@ -78,8 +135,8 @@ class MainActivity : AppCompatActivity() {
             WindowInsetsCompat.CONSUMED
         }
 
-        // CookieManager: sesion persistente
-        val cookieManager = CookieManager.getInstance()
+        // CookieManager: sesion persistente (Android)
+        val cookieManager = AndroidCookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(binding.webView, true)
 
@@ -196,9 +253,7 @@ class MainActivity : AppCompatActivity() {
                         // Build OkHttp request
                         val rb = Request.Builder().url(url)
 
-                        // Propagar cookies
-                        CookieManager.getInstance().getCookie(url)?.let { rb.header("Cookie", it) }
-
+                        // Propagar cookies (OkHttp CookieJar will also include cookies set from previous responses)
                         // Propagar UA/Accept/Accept-Language/Referer for fidelity
                         try { rb.header("User-Agent", binding.webView.settings.userAgentString) } catch (_: Exception) {}
                         rb.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
