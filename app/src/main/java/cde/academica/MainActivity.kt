@@ -49,7 +49,8 @@ class MainActivity : AppCompatActivity() {
 
         // Nav bar transparente
         window.navigationBarColor = Color.TRANSPARENT
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Make the framework apply system window insets (don't draw behind status bar)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
 
         // Empuja el contenido del WebView por debajo de la status bar y por encima
         // de la nav bar, para que la web no quede tapada por los system bars.
@@ -58,7 +59,8 @@ class MainActivity : AppCompatActivity() {
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
             v.updatePadding(top = bars.top, bottom = bars.bottom)
-            WindowInsetsCompat.CONSUMED
+            // Return the insets so they are not consumed and propagate normally
+            insets
         }
 
         // CookieManager: sesion persistente
