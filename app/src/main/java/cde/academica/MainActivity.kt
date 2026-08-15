@@ -241,8 +241,7 @@ class MainActivity : AppCompatActivity() {
             "academica_optimizer_v9.0-alpha.js",
             "academica_content_general_v9.0-alpha.js",
             "academica_navsidebar_v9.0-alpha.js",
-            "academica_login_cleanup_v9.0-alpha.js",
-            "academica_welcome_cleanup_v9.0-alpha.js"
+            "academica_login_cleanup_v9.0-alpha.js"
         )
 
         scripts.forEach { filename ->
