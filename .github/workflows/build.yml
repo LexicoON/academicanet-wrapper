@@ -53,7 +53,7 @@ jobs:
             python3 "$TMPDIR/vd2png/VD-Android-VectorDrawable2PNG.py" "app/src/main/res/drawable/ic_launcher_background.xml" "$TMPDIR/out/bg_${size}.png" "$size"
 
             # composite fg over bg centered using Python Pillow
-            cat > /tmp/composite_${size}.py << 'EOF'
+            cat > /tmp/composite_${size}.py << EOF
 from PIL import Image
 bg = Image.open("$TMPDIR/out/bg_${size}.png").convert('RGBA')
 fg = Image.open("$TMPDIR/out/fg_${size}.png").convert('RGBA')
@@ -77,7 +77,7 @@ EOF
           python3 "$TMPDIR/vd2png/VD-Android-VectorDrawable2PNG.py" "app/src/main/res/drawable/ic_launcher_foreground.xml" "$TMPDIR/out/fg_512.png" 512
           python3 "$TMPDIR/vd2png/VD-Android-VectorDrawable2PNG.py" "app/src/main/res/drawable/ic_launcher_background.xml" "$TMPDIR/out/bg_512.png" 512
           mkdir -p app/playstore
-          cat > /tmp/composite_512.py << 'EOF'
+          cat > /tmp/composite_512.py << EOF
 from PIL import Image
 bg = Image.open("$TMPDIR/out/bg_512.png").convert('RGBA')
 fg = Image.open("$TMPDIR/out/fg_512.png").convert('RGBA')
