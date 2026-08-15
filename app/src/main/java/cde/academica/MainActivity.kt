@@ -49,8 +49,7 @@ class MainActivity : AppCompatActivity() {
 
         // Nav bar transparente
         window.navigationBarColor = Color.TRANSPARENT
-        // Make the framework apply system window insets (don't draw behind status bar)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         // Empuja el contenido del WebView por debajo de la status bar y por encima
         // de la nav bar, para que la web no quede tapada por los system bars.
@@ -59,8 +58,7 @@ class MainActivity : AppCompatActivity() {
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
             v.updatePadding(top = bars.top, bottom = bars.bottom)
-            // Return the insets so they are not consumed and propagate normally
-            insets
+            WindowInsetsCompat.CONSUMED
         }
 
         // CookieManager: sesion persistente
@@ -243,8 +241,7 @@ class MainActivity : AppCompatActivity() {
             "academica_optimizer_v9.0-alpha.js",
             "academica_content_general_v9.0-alpha.js",
             "academica_navsidebar_v9.0-alpha.js",
-            "academica_login_cleanup_v9.0-alpha.js",
-            "academica_welcome_cleanup_v9.0-alpha.js"
+            "academica_login_cleanup_v9.0-alpha.js"
         )
 
         scripts.forEach { filename ->
