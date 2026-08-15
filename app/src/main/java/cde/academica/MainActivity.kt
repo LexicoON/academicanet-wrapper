@@ -21,15 +21,28 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updatePadding
 import cde.academica.databinding.ActivityMainBinding
 import java.io.ByteArrayInputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.charset.Charset
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private var scriptsInjected = false
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+
+    // Reusable OkHttp client for interceptor
+    private val httpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .callTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build()
+    }
 
     companion object {
         private const val LOGIN_URL = "academicanet.com/index"
@@ -103,14 +116,14 @@ class MainActivity : AppCompatActivity() {
                     scriptsInjected = false
                     url?.let { updateStatusBarColor(it) }
 
-                    // Anti-FOUC: ocultar TODO antes de que cargue nada
+                    // Anti-FOUC: gentle safety-net (fade-in body) while interceptor injects CSS
                     view?.evaluateJavascript(
                         """
                         (function(){
                             if (!document.getElementById('academica-anti-fouc')) {
                                 var s = document.createElement('style');
                                 s.id = 'academica-anti-fouc';
-                                s.textContent = 'html { visibility: hidden !important; }';
+                                s.textContent = 'body { opacity: 0 !important; transition: opacity 0.12s ease !important; }';
                                 document.documentElement.appendChild(s);
                             }
                         })();
@@ -124,14 +137,14 @@ class MainActivity : AppCompatActivity() {
                         injectAllScripts(view)
                         scriptsInjected = true
 
-                        // Quitar anti-FOUC: revelar pagina suavemente
+                        // Remove anti-FOUC: reveal page smoothly
                         view.evaluateJavascript(
                             """
                             (function(){
                                 var s = document.getElementById('academica-anti-fouc');
                                 if (s) {
-                                    s.textContent = 'html { visibility: visible !important; opacity: 1 !important; transition: opacity 0.15s ease; }';
-                                    setTimeout(function(){ s.remove(); }, 200);
+                                    s.textContent = 'body { opacity: 1 !important; transition: opacity 0.15s ease !important; }';
+                                    setTimeout(function(){ s.remove(); }, 300);
                                 }
                             })();
                             """.trimIndent(), null
@@ -180,22 +193,31 @@ class MainActivity : AppCompatActivity() {
                     if (!request.isForMainFrame || request.method != "GET" || !host.contains("academicanet.com")) return null
 
                     try {
-                        val conn = URL(url).openConnection() as HttpURLConnection
-                        conn.instanceFollowRedirects = true
-                        conn.connectTimeout = 15000
-                        conn.readTimeout = 15000
-                        conn.requestMethod = "GET"
-                        val cookie = CookieManager.getInstance().getCookie(url)
-                        if (!cookie.isNullOrEmpty()) conn.setRequestProperty("Cookie", cookie)
-                        conn.connect()
+                        // Build OkHttp request
+                        val rb = Request.Builder().url(url)
 
-                        val contentType = conn.contentType ?: "text/html; charset=utf-8"
-                        if (!contentType.contains("text/html")) {
-                            return WebResourceResponse(contentType.split(";")[0], "UTF-8", conn.inputStream)
+                        // Propagar cookies
+                        CookieManager.getInstance().getCookie(url)?.let { rb.header("Cookie", it) }
+
+                        // Propagar UA/Accept/Accept-Language/Referer for fidelity
+                        try { rb.header("User-Agent", binding.webView.settings.userAgentString) } catch (_: Exception) {}
+                        rb.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                        rb.header("Accept-Language", Locale.getDefault().toLanguageTag())
+                        // Use current webview URL as Referer when available
+                        binding.webView.url?.let { rb.header("Referer", it) }
+
+                        val resp = httpClient.newCall(rb.build()).execute()
+                        val contentType = resp.header("Content-Type") ?: "text/html; charset=utf-8"
+
+                        // If not HTML, stream it directly
+                        if (!contentType.contains("text/html", ignoreCase = true)) {
+                            val mime = contentType.split(";")[0].ifEmpty { "application/octet-stream" }
+                            val bodyStream = resp.body?.byteStream()
+                            if (bodyStream != null) return WebResourceResponse(mime, "UTF-8", bodyStream)
+                            return null
                         }
 
-                        val charset = "UTF-8"
-                        val originalHtml = conn.inputStream.bufferedReader(Charset.forName(charset)).use { it.readText() }
+                        val bodyStr = resp.body?.string() ?: ""
 
                         val globalCss = assets.open("academica_content_general.css").bufferedReader().use { it.readText() }
                         val navCss = assets.open("academica_navsidebar.css").bufferedReader().use { it.readText() }
@@ -209,9 +231,9 @@ class MainActivity : AppCompatActivity() {
                             sb.append("<style id=\"academica-inject-login\">").append(loginCss).append("</style>")
                         }
 
-                        val modifiedHtml = injectIntoHead(originalHtml, sb.toString())
-                        val data = modifiedHtml.toByteArray(Charset.forName(charset))
-                        return WebResourceResponse("text/html", charset, ByteArrayInputStream(data))
+                        val modifiedHtml = injectIntoHead(bodyStr, sb.toString())
+                        val data = modifiedHtml.toByteArray(Charset.forName("UTF-8"))
+                        return WebResourceResponse("text/html", "UTF-8", ByteArrayInputStream(data))
                     } catch (e: Exception) {
                         android.util.Log.w("AcademicaNet", "Intercept fallback: ${e.message}")
                         return null
