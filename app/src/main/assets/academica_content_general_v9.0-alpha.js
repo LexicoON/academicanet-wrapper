@@ -1,8 +1,32 @@
-/* ACADEMICA NET - CONTENIDO GENERAL v9.0-alpha
-   Inyectado por interceptor HTTP de la app nativa.
-   Excluir: /mensaje, /reportcard, /promedios, /aulavirtual, /clases
-   (la exclusión la hace el CSS con selectores si querés, o el JS login_cleanup)
-*/
+// ==UserScript==
+// @name         Academica CSS Fix - Contenido General v9.0-alpha
+// @description  Fixes de CSS mobile para AcademicaNet (excluye Mensaje, ReportCard, Promedios, AulaVirtual)
+// @version      9.0-alpha
+// @match        https://academicanet.com/*
+// @grant        none
+// @run-at       document-start
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    const STYLE_ID = 'academica-content-css';
+
+    function isBlocked() {
+        const path = window.location.pathname.toLowerCase();
+        const blocked = ['/mensaje','/reportcard','/promedios','/aulavirtual','/clases'];
+        return blocked.some(p => path.includes(p));
+    }
+
+    if (isBlocked()) {
+        console.log('[Academica Content v9.0-alpha] Pagina excluida:', location.pathname);
+        return;
+    }
+
+    const cssText = `
+/* ═══════════════════════════════════════════
+   ACADEMICA NET - CONTENIDO GENERAL v9.0-alpha
+   ═══════════════════════════════════════════ */
 
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body { overflow-x: hidden !important; min-width: auto !important; }
@@ -207,7 +231,7 @@ input.form-control, .input-group-text, .custom-select,
 }
 
 /* ═══════════════════════════════════════════
-   AVATARES — FIX v9.0: img llena el círculo
+   AVATARES — FIX v9.0
    ═══════════════════════════════════════════ */
 .avatar img, .avatar .round, .avatar img[width="40"][height="40"] {
     width: 100% !important;
@@ -369,7 +393,7 @@ select.form-control { font-size: 16px !important; }
 ::-webkit-scrollbar-thumb:hover { background: #aaa; }
 
 /* ═══════════════════════════════════════════
-   SOLO MOBILE — reglas que rompen desktop
+   SOLO MOBILE
    ═══════════════════════════════════════════ */
 @media (max-width: 768px) {
     .app-content { padding: 0 !important; margin: 0 !important; }
@@ -393,10 +417,60 @@ select.form-control { font-size: 16px !important; }
     .footer [class*="col-"] { text-align: center !important; margin-bottom: 0.3rem !important; }
 }
 
-/* TABLET — SIN margin-left: 0 en content-wrapper */
+/* TABLET */
 @media (min-width: 769px) and (max-width: 1024px) {
     .main-menu { width: 280px !important; }
     .content-wrapper { padding: 0.8rem !important; }
     .form-group.row > [class*="col-md-3"] { flex: 0 0 30% !important; max-width: 30% !important; }
     .form-group.row > [class*="col-md-9"] { flex: 0 0 70% !important; max-width: 70% !important; }
 }
+`;
+
+    function createStyle() {
+        const style = document.createElement('style');
+        style.id = STYLE_ID;
+        style.textContent = cssText;
+        return style;
+    }
+
+    function inject() {
+        if (document.getElementById(STYLE_ID)) return true;
+        const style = createStyle();
+        if (document.head) { document.head.appendChild(style); return true; }
+        if (document.documentElement) { document.documentElement.appendChild(style); }
+        return false;
+    }
+
+    inject();
+
+    const guardianObserver = new MutationObserver(() => {
+        if (!document.getElementById(STYLE_ID)) inject();
+        const existing = document.getElementById(STYLE_ID);
+        if (existing && document.head && existing.parentNode !== document.head) {
+            document.head.appendChild(existing);
+        }
+    });
+    guardianObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+    const pollInterval = setInterval(() => {
+        if (document.getElementById(STYLE_ID)) {
+            const existing = document.getElementById(STYLE_ID);
+            if (document.head && existing.parentNode !== document.head) {
+                document.head.appendChild(existing);
+            }
+        } else { inject(); }
+    }, 50);
+    setTimeout(() => clearInterval(pollInterval), 5000);
+
+    let lastUrl = location.href;
+    new MutationObserver(() => {
+        if (location.href !== lastUrl) {
+            lastUrl = location.href;
+            if (!isBlocked()) setTimeout(inject, 0);
+        }
+    }).observe(document, { subtree: true, childList: true });
+
+    document.addEventListener('DOMContentLoaded', inject);
+    window.addEventListener('load', inject);
+    console.log('[Academica Content v9.0-alpha] Inyectado');
+})();

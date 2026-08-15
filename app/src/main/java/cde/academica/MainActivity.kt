@@ -20,102 +20,50 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updatePadding
 import cde.academica.databinding.ActivityMainBinding
-import okhttp3.Cookie
-import okhttp3.CookieJar
-import okhttp3.HttpUrl
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.io.ByteArrayInputStream
-import java.nio.charset.Charset
-import java.util.Locale
-import java.util.concurrent.TimeUnit
-import android.webkit.CookieManager as AndroidCookieManager
 
 /**
- * MainActivity - Wrapper nativo de AcademicaNet v1.9.0-alpha-4
+ * MainActivity - Wrapper nativo de AcademicaNet v1.9.0-alpha-5
  *
- * Arquitectura:
- *  1. shouldInterceptRequest (OkHttp) intercepta el main-frame GET e inyecta
- *     los 3 CSS (global, navbar, login) en el <head> del HTML antes del render.
- *     Esto hace el anti-FOUC natural (el CSS ya está cuando el browser parsea).
- *
- *  2. onPageFinished inyecta los JS de lógica (optimizer, login cleanup,
- *     welcome cleanup) via evaluateJavascript.
- *
- *  3. POST requests (login) NO se interceptan - pasan tal cual al servidor.
- *
- *  4. CookieManager de Android sincroniza con el CookieJar de OkHttp para
- *     mantener la sesión persistente.
+ * Estrategia de inyeccion de CSS:
+ *  - CSS viene en archivos .js con run-at: document-start (anti-FOUC real)
+ *  - JavaScriptInterface expone APIs nativas (AcademicaNative) a la web
+ *  - onPageFinished inyecta scripts de lógica
+ *  - CookieManager de Android maneja sesión persistente
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private var scriptsInjected = false
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
-
-    // OkHttp client con CookieJar que bridge con AndroidCookieManager
-    private val httpClient: OkHttpClient by lazy {
-        val cookieJar = object : CookieJar {
-            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                try {
-                    val cm = AndroidCookieManager.getInstance()
-                    for (c in cookies) {
-                        val cookieStr = StringBuilder().apply {
-                            append(c.name).append("=").append(c.value)
-                            if (!c.path.isNullOrEmpty()) append("; Path=").append(c.path)
-                            if (!c.domain.isNullOrEmpty()) append("; Domain=").append(c.domain)
-                            if (c.secure) append("; Secure")
-                            if (c.httpOnly) append("; HttpOnly")
-                        }.toString()
-                        cm.setCookie(url.toString(), cookieStr)
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) cm.flush()
-                } catch (e: Exception) {
-                    android.util.Log.w("AcademicaNet", "CookieJar.save error: ${e.message}")
-                }
-            }
-
-            override fun loadForRequest(url: HttpUrl): List<Cookie> {
-                return try {
-                    val cm = AndroidCookieManager.getInstance()
-                    val cookieHeader = cm.getCookie(url.toString()) ?: return emptyList()
-                    val host = url.host
-                    val list = mutableListOf<Cookie>()
-                    cookieHeader.split(";").forEach { pair ->
-                        val parts = pair.split("=", limit = 2)
-                        if (parts.size == 2) {
-                            try {
-                                list.add(
-                                    Cookie.Builder()
-                                        .name(parts[0].trim())
-                                        .value(parts[1].trim())
-                                        .domain(host)
-                                        .path("/")
-                                        .build()
-                                )
-                            } catch (_: Exception) {}
-                        }
-                    }
-                    list
-                } catch (e: Exception) {
-                    emptyList()
-                }
-            }
-        }
-
-        OkHttpClient.Builder()
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .cookieJar(cookieJar)
-            .callTimeout(20, TimeUnit.SECONDS)
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .build()
-    }
 
     companion object {
         private const val LOGIN_URL_FRAGMENT = "/index"
         private val COLOR_LOGIN = Color.parseColor("#1a237e")
         private val COLOR_WELCOME = Color.parseColor("#FFFFFF")
+    }
+
+    /**
+     * JavaScriptInterface - expone APIs nativas a JavaScript de la web.
+     * Esto permite integración real: la web puede llamar a Android para
+     * hacer cosas que un WebView puro no puede (downloads, file picker, etc.)
+     */
+    inner class AcademicaNative {
+        @JavascriptInterface
+        fun showToast(message: String) {
+            runOnUiThread {
+                Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        @JavascriptInterface
+        fun getAppVersion(): String {
+            return try {
+                packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
+            } catch (e: Exception) { "unknown" }
+        }
+
+        @JavascriptInterface
+        fun isNative(): Boolean = true
     }
 
     private val filePickerLauncher = registerForActivityResult(
@@ -135,7 +83,7 @@ class MainActivity : AppCompatActivity() {
         window.navigationBarColor = Color.TRANSPARENT
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        // Empuja el WebView por debajo de status bar y por encima de nav bar
+        // Empuja WebView por debajo de status bar y por encima de nav bar
         ViewCompat.setOnApplyWindowInsetsListener(binding.webView) { v, insets ->
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
@@ -145,7 +93,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // CookieManager Android
-        val cookieManager = AndroidCookieManager.getInstance()
+        val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(binding.webView, true)
 
@@ -175,18 +123,24 @@ class MainActivity : AppCompatActivity() {
                 mediaPlaybackRequiresUserGesture = true
             }
 
+            // JavaScriptInterface - integración nativa con la web
+            addJavascriptInterface(AcademicaNative(), "AcademicaNative")
+
             webViewClient = object : WebViewClient() {
 
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
                     url?.let { updateStatusBarColor(it) }
+                    scriptsInjected = false
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    if (view != null) {
-                        // Inyecta solo los JS de lógica (NO CSS - eso ya lo hizo el interceptor)
+                    if (view != null && !scriptsInjected) {
+                        // El CSS ya está inyectado desde document-start.
+                        // Acá solo inyectamos lógica adicional (optimizer, cleanup).
                         injectLogicScripts(view)
+                        scriptsInjected = true
                     }
                 }
 
@@ -194,16 +148,6 @@ class MainActivity : AppCompatActivity() {
                     val url = request?.url?.toString() ?: return false
                     if (url.startsWith("blob:")) {
                         Toast.makeText(this@MainActivity, "Descargando archivo...", Toast.LENGTH_SHORT).show()
-                        view?.evaluateJavascript(
-                            """
-                            (function(){
-                                var link = document.createElement('a');
-                                link.href = '$url';
-                                link.target = '_blank';
-                                link.click();
-                            })();
-                            """.trimIndent(), null
-                        )
                         return true
                     }
                     return false
@@ -221,67 +165,6 @@ class MainActivity : AppCompatActivity() {
                             "Error de conexion. Verifica tu internet.",
                             Toast.LENGTH_LONG
                         ).show()
-                    }
-                }
-
-                /**
-                 * Interceptor HTTP nativo: inyecta los 3 CSS en el <head>
-                 * ANTES de que el browser renderice. Esto elimina el FOUC
-                 * de forma natural (no necesita fade-in porque el CSS ya está).
-                 *
-                 * Solo intercepta:
-                 *  - main frame (no imágenes, no scripts, no iframes)
-                 *  - GET (no POST, así el login pasa tal cual)
-                 *  - host academicanet.com
-                 */
-                override fun shouldInterceptRequest(
-                    view: WebView?,
-                    request: WebResourceRequest?
-                ): WebResourceResponse? {
-                    val url = request?.url?.toString() ?: return null
-                    val host = request.url.host ?: return null
-                    if (!request.isForMainFrame || request.method != "GET" || !host.contains("academicanet.com")) {
-                        return null
-                    }
-
-                    return try {
-                        val rb = Request.Builder().url(url)
-                        try { rb.header("User-Agent", binding.webView.settings.userAgentString) } catch (_: Exception) {}
-                        rb.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                        rb.header("Accept-Language", Locale.getDefault().toLanguageTag())
-                        binding.webView.url?.let { rb.header("Referer", it) }
-
-                        val resp = httpClient.newCall(rb.build()).execute()
-                        val contentType = resp.header("Content-Type") ?: "text/html; charset=utf-8"
-
-                        // No HTML: stream directo sin modificar
-                        if (!contentType.contains("text/html", ignoreCase = true)) {
-                            val mime = contentType.split(";")[0].ifEmpty { "application/octet-stream" }
-                            val bodyStream = resp.body?.byteStream()
-                            return if (bodyStream != null) WebResourceResponse(mime, "UTF-8", bodyStream) else null
-                        }
-
-                        val bodyStr = resp.body?.string() ?: ""
-
-                        // Cargar los 3 CSS desde assets
-                        val globalCss = assets.open("academica_content_general.css").bufferedReader().use { it.readText() }
-                        val navCss = assets.open("academica_navsidebar.css").bufferedReader().use { it.readText() }
-                        val loginCss = assets.open("academica_login.css").bufferedReader().use { it.readText() }
-
-                        val sb = StringBuilder()
-                        sb.append("<style id=\"academica-inject-global\">").append(globalCss).append("</style>")
-                        sb.append("<style id=\"academica-inject-nav\">").append(navCss).append("</style>")
-                        val lowUrl = url.lowercase()
-                        if (lowUrl.endsWith("/") || lowUrl.contains("/index") || lowUrl.contains("/views/account/login")) {
-                            sb.append("<style id=\"academica-inject-login\">").append(loginCss).append("</style>")
-                        }
-
-                        val modifiedHtml = injectIntoHead(bodyStr, sb.toString())
-                        val data = modifiedHtml.toByteArray(Charset.forName("UTF-8"))
-                        WebResourceResponse("text/html", "UTF-8", ByteArrayInputStream(data))
-                    } catch (e: Exception) {
-                        android.util.Log.w("AcademicaNet", "Intercept fallback: ${e.message}")
-                        null  // fallback: el WebView pide el recurso normalmente
                     }
                 }
             }
@@ -351,8 +234,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Inyecta solo los JS de lógica (NO CSS).
-     * El CSS ya fue inyectado por el interceptor HTTP en el <head>.
+     * Inyecta solo JS de lógica adicional (no CSS - ya viene en los .js con document-start).
      */
     private fun injectLogicScripts(webView: WebView) {
         val scripts = listOf(
@@ -370,19 +252,6 @@ class MainActivity : AppCompatActivity() {
                 android.util.Log.e("Academica", "Error inyectando $filename: ${e.message}")
             }
         }
-    }
-
-    private fun injectIntoHead(html: String, insert: String): String {
-        val idx = html.indexOf("<head", ignoreCase = true)
-        if (idx >= 0) {
-            val headStart = html.indexOf('>', idx)
-            if (headStart >= 0) {
-                val before = html.substring(0, headStart + 1)
-                val after = html.substring(headStart + 1)
-                return before + insert + after
-            }
-        }
-        return "<head>$insert</head>$html"
     }
 
     override fun onBackPressed() {

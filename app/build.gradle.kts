@@ -11,8 +11,8 @@ android {
         applicationId = "cde.academica"
         minSdk = 30
         targetSdk = 34
-        versionCode = 194
-        versionName = "1.9.0-alpha-4"
+        versionCode = 195
+        versionName = "1.9.0-alpha-5"
     }
 
     signingConfigs {

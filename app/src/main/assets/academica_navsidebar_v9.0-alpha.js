@@ -1,12 +1,27 @@
-/* ACADEMICA NET - NAVBAR & SIDEBAR v9.0-alpha
-   Inyectado por interceptor HTTP de la app nativa.
-*/
+// ==UserScript==
+// @name         Academica CSS Fix - Navbar & Sidebar v9.0-alpha
+// @description  Navbar glassmorphism, sidebar styling, fondo hexagonal global
+// @version      9.0-alpha
+// @match        https://academicanet.com/*
+// @grant        none
+// @run-at       document-start
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    const STYLE_ID = 'academica-navsidebar-css';
+
+    const cssText = `
+/* ═══════════════════════════════════════════
+   ACADEMICA NET - NAVBAR & SIDEBAR v9.0-alpha
+   ═══════════════════════════════════════════ */
 
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body { overflow-x: hidden !important; min-width: auto !important; }
 
 /* ═══════════════════════════════════════════
-   FONDO HEXAGONAL GLOBAL (todas las páginas)
+   FONDO HEXAGONAL GLOBAL
    ═══════════════════════════════════════════ */
 body {
     background-color: #f8f9fa !important;
@@ -19,8 +34,7 @@ body {
 }
 
 /* ═══════════════════════════════════════════
-   NAVBAR - FROSTED GLASS (menos vívido)
-   Tinte azulado sutil, saturate bajo, opaco
+   NAVBAR - FROSTED GLASS
    ═══════════════════════════════════════════ */
 .navbar.header-navbar {
     min-height: 56px !important;
@@ -35,7 +49,6 @@ body {
     z-index: 1030 !important;
 }
 
-/* Reflejo de luz superior */
 .navbar.header-navbar::before {
     content: "" !important;
     position: absolute !important;
@@ -45,12 +58,10 @@ body {
     pointer-events: none !important;
 }
 
-/* NAVBAR REDONDEADO ABAJO - todos los tamaños */
 .navbar, .header-navbar, .navbar-container, .navbar-collapse {
     border-radius: 0 0 14px 14px !important;
 }
 
-/* HEADER SHADOW - sutil */
 .header-navbar-shadow {
     height: 2px !important;
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04) !important;
@@ -66,9 +77,7 @@ body {
 .navbar-container { padding: 0 !important; }
 .navbar-brand { font-size: 0.95rem !important; }
 
-/* ═══════════════════════════════════════════
-   LOGO COLEGIO - REDONDO Y CENTRADO
-   ═══════════════════════════════════════════ */
+/* LOGO COLEGIO */
 #img_logo_colegio {
     width: 40px !important;
     height: 40px !important;
@@ -98,9 +107,7 @@ body {
     text-decoration: none !important;
 }
 
-/* ═══════════════════════════════════════════
-   NOTIFICACIONES - CENTRADAS + BADGES PEQUEÑOS
-   ═══════════════════════════════════════════ */
+/* NOTIFICACIONES */
 .nav.navbar-nav.float-right {
     display: flex !important;
     align-items: center !important;
@@ -144,13 +151,9 @@ body {
     line-height: 1 !important;
 }
 
-/* Ocultar ícono de Notificaciones (campana) */
 #LINotif { display: none !important; }
 
-/* ═══════════════════════════════════════════
-   SIDEBAR - SOLO MOBILE (blur azul)
-   Desktop: completamente original, sin tocar
-   ═══════════════════════════════════════════ */
+/* SIDEBAR MOBILE */
 @media (max-width: 768px) {
     .navbar .search-input,
     .navbar .nav-item.d-none.d-lg-block { display: none !important; }
@@ -247,9 +250,7 @@ body {
     .main-menu ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 2px; }
 }
 
-/* ═══════════════════════════════════════════
-   CALENDARIO STICKY TOOLBAR - BLUR
-   ═══════════════════════════════════════════ */
+/* CALENDARIO STICKY TOOLBAR */
 .kt-sticky-toolbar {
     background: rgba(245, 248, 252, 0.55) !important;
     backdrop-filter: blur(16px) saturate(160%) !important;
@@ -282,3 +283,53 @@ body {
     border-radius: 8px !important;
     margin: 4px !important;
 }
+`;
+
+    function createStyle() {
+        const style = document.createElement('style');
+        style.id = STYLE_ID;
+        style.textContent = cssText;
+        return style;
+    }
+
+    function inject() {
+        if (document.getElementById(STYLE_ID)) return true;
+        const style = createStyle();
+        if (document.head) { document.head.appendChild(style); return true; }
+        if (document.documentElement) { document.documentElement.appendChild(style); }
+        return false;
+    }
+
+    inject();
+
+    const guardianObserver = new MutationObserver(() => {
+        if (!document.getElementById(STYLE_ID)) inject();
+        const existing = document.getElementById(STYLE_ID);
+        if (existing && document.head && existing.parentNode !== document.head) {
+            document.head.appendChild(existing);
+        }
+    });
+    guardianObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+    const pollInterval = setInterval(() => {
+        if (document.getElementById(STYLE_ID)) {
+            const existing = document.getElementById(STYLE_ID);
+            if (document.head && existing.parentNode !== document.head) {
+                document.head.appendChild(existing);
+            }
+        } else { inject(); }
+    }, 50);
+    setTimeout(() => clearInterval(pollInterval), 5000);
+
+    let lastUrl = location.href;
+    new MutationObserver(() => {
+        if (location.href !== lastUrl) {
+            lastUrl = location.href;
+            setTimeout(inject, 0);
+        }
+    }).observe(document, { subtree: true, childList: true });
+
+    document.addEventListener('DOMContentLoaded', inject);
+    window.addEventListener('load', inject);
+    console.log('[Academica NavSidebar v9.0-alpha] Inyectado');
+})();
