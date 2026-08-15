@@ -20,6 +20,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updatePadding
 import cde.academica.databinding.ActivityMainBinding
+import java.io.ByteArrayInputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.nio.charset.Charset
 
 class MainActivity : AppCompatActivity() {
 
@@ -168,6 +172,51 @@ class MainActivity : AppCompatActivity() {
                         ).show()
                     }
                 }
+
+                override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+                    val url = request?.url?.toString() ?: return null
+                    val host = request?.url?.host ?: return null
+                    // Solo interceptar main-frame GET para academicanet.com
+                    if (!request.isForMainFrame || request.method != "GET" || !host.contains("academicanet.com")) return null
+
+                    try {
+                        val conn = URL(url).openConnection() as HttpURLConnection
+                        conn.instanceFollowRedirects = true
+                        conn.connectTimeout = 15000
+                        conn.readTimeout = 15000
+                        conn.requestMethod = "GET"
+                        val cookie = CookieManager.getInstance().getCookie(url)
+                        if (!cookie.isNullOrEmpty()) conn.setRequestProperty("Cookie", cookie)
+                        conn.connect()
+
+                        val contentType = conn.contentType ?: "text/html; charset=utf-8"
+                        if (!contentType.contains("text/html")) {
+                            return WebResourceResponse(contentType.split(";")[0], "UTF-8", conn.inputStream)
+                        }
+
+                        val charset = "UTF-8"
+                        val originalHtml = conn.inputStream.bufferedReader(Charset.forName(charset)).use { it.readText() }
+
+                        val globalCss = assets.open("academica_content_general.css").bufferedReader().use { it.readText() }
+                        val navCss = assets.open("academica_navsidebar.css").bufferedReader().use { it.readText() }
+                        val loginCss = assets.open("academica_login.css").bufferedReader().use { it.readText() }
+
+                        val sb = StringBuilder()
+                        sb.append("<style id=\"academica-inject-global\">").append(globalCss).append("</style>")
+                        sb.append("<style id=\"academica-inject-nav\">").append(navCss).append("</style>")
+                        val lowUrl = url.lowercase()
+                        if (lowUrl.endsWith("/") || lowUrl.contains("/index") || lowUrl.contains("/views/account/login")) {
+                            sb.append("<style id=\"academica-inject-login\">").append(loginCss).append("</style>")
+                        }
+
+                        val modifiedHtml = injectIntoHead(originalHtml, sb.toString())
+                        val data = modifiedHtml.toByteArray(Charset.forName(charset))
+                        return WebResourceResponse("text/html", charset, ByteArrayInputStream(data))
+                    } catch (e: Exception) {
+                        android.util.Log.w("AcademicaNet", "Intercept fallback: ${e.message}")
+                        return null
+                    }
+                }
             }
 
             webChromeClient = object : WebChromeClient() {
@@ -253,6 +302,19 @@ class MainActivity : AppCompatActivity() {
                 android.util.Log.e("Academica", "Error inyectando $filename: ${e.message}")
             }
         }
+    }
+
+    private fun injectIntoHead(html: String, insert: String): String {
+        val idx = html.indexOf("<head", ignoreCase = true)
+        if (idx >= 0) {
+            val headStart = html.indexOf('>', idx)
+            if (headStart >= 0) {
+                val before = html.substring(0, headStart + 1)
+                val after = html.substring(headStart + 1)
+                return before + insert + after
+            }
+        }
+        return "<head>$insert</head>$html"
     }
 
     override fun onBackPressed() {
